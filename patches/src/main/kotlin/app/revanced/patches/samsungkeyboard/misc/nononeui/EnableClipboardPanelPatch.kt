@@ -2,8 +2,8 @@ package app.revanced.patches.samsungkeyboard.misc.nononeui
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.revanced.patches.samsungkeyboard.shared.Constants.COMPATIBILITY_SAMSUNG_KEYBOARD
-import app.revanced.util.indexOfFirstInstructionOrThrow
 import com.android.tools.smali.dexlib2.Opcode
 
 private const val CLIP_BOARD_HANDLER_TYPE =
