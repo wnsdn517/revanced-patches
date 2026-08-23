@@ -112,7 +112,7 @@ private fun ResourcePatchContext.replaceSprResources() {
     drawableFiles.asSequence()
         .filter { it.extension == "xml" && "<bitmap" in it.readText() }
         .forEach { file ->
-            document(file.relativeTo(resourceDirectory.parentFile).path).use { document ->
+            document(file.relativeTo(resourceDirectory.parentFile).invariantSeparatorsPath).use { document ->
                 document.getElementsByTagName("bitmap")
                     .asSequence()
                     .filterIsInstance<Element>()
