@@ -42,3 +42,8 @@ internal object ClipboardKnoxCheckFingerprint : Fingerprint(
     parameters = emptyList(),
     strings = listOf("isClipboardAllowedAsUser"),
 )
+
+internal object PlatformFeatureFlagsInitializerFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.STATIC, AccessFlags.CONSTRUCTOR),
+    strings = listOf("SEC_FLOATING_FEATURE_CAMERA_SUPPORT_AVATAR"),
+)

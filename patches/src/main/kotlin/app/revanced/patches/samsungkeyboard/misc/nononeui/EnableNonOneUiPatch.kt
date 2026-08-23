@@ -204,6 +204,7 @@ val enableNonOneUiPatch = bytecodePatch(
         StoreDownloadRequestFingerprint.method.applyStoreProfile()
         StoreUpdateCheckRequestFingerprint.method.applyStoreProfile()
         ShowSoftInputFingerprint.method.applyShowSoftInputCompat()
+        PlatformFeatureFlagsInitializerFingerprint.method.forcePlatformVersionSupported()
 
         val initializedServiceCount = inputMethodServiceClassTypes.count { type ->
             val classDef = classDefBy(type)
@@ -245,6 +246,15 @@ private fun MutableMethod.applyShowSoftInputCompat() {
             return-void
         """.trimIndent(),
     )
+}
+
+private fun MutableMethod.forcePlatformVersionSupported() {
+    findInstructionIndicesReversed {
+        opcode == Opcode.SGET && getReference<FieldReference>()?.isSemPlatformVersionField() == true
+    }.forEach { index ->
+        val register = getInstruction<OneRegisterInstruction>(index).registerA
+        replaceInstruction(index, "const v$register, 0xf423f")
+    }
 }
 
 private fun Instruction.requiresPlatformReplacement(
@@ -340,6 +350,11 @@ private fun FieldReference.sprStyleableReference() =
         definingClass == SAMSUNG_SPR_STYLEABLE_TYPE &&
             (name == "SprDrawable" || name.startsWith("SprDrawable_"))
     }?.let { ImmutableFieldReference(SPR_STYLEABLE_TYPE, name, type) }
+
+private fun FieldReference.isSemPlatformVersionField() =
+    definingClass == "Landroid/os/Build\$VERSION;" &&
+        (name == "SEM_PLATFORM_INT" || name == "SEM_INT") &&
+        type == "I"
 
 private fun MutableMethod.replaceFieldReference(
     index: Int,
