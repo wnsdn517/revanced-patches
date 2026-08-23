@@ -36,3 +36,7 @@ internal object ClipBoardHandlerConstructorFingerprint : Fingerprint(
     returnType = "V",
     strings = listOf("semclipboard"),
 )
+
+internal object ClipboardKnoxCheckFingerprint : Fingerprint(
+    strings = listOf("isClipboardAllowedAsUser", "kbdContext"),
+)
