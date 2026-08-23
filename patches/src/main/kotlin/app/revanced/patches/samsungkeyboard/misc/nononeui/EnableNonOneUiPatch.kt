@@ -169,12 +169,14 @@ val enableNonOneUiPatch = bytecodePatch(
     execute {
         val definedTypes = buildSet { classDefForEach { add(it.type) } }
         val unavailableType: (String) -> Boolean = { type -> type.isUnavailableSamsungType(definedTypes) }
+        val platformFlagsClassType = PlatformFeatureFlagsInitializerFingerprint.classDef.type
 
         classDefForEach classLoop@{ classDef ->
             if (classDef.type.startsWith(EXTENSION_PACKAGE)) return@classLoop
 
             val replaceDrawableAccess = !classDef.type.startsWith(SPR_PACKAGE)
             val replaceSettingsWindowFlags = classDef.type.startsWith(SETTINGS_PACKAGE)
+            val forcePlatformVersion = classDef.type == platformFlagsClassType
             val mutableClass by lazy { mutableClassDefBy(classDef) }
 
             if (classDef.interfaces.any(unavailableType)) {
@@ -189,6 +191,7 @@ val enableNonOneUiPatch = bytecodePatch(
                         unavailableType,
                         replaceDrawableAccess,
                         replaceSettingsWindowFlags,
+                        forcePlatformVersion,
                     )
                 }.forEach { index ->
                     mutableMethod.replacePlatformDependency(
@@ -196,6 +199,7 @@ val enableNonOneUiPatch = bytecodePatch(
                         unavailableType = unavailableType,
                         replaceDrawableAccess = replaceDrawableAccess,
                         replaceSettingsWindowFlags = replaceSettingsWindowFlags,
+                        forcePlatformVersion = forcePlatformVersion,
                     )
                 }
             }
@@ -204,7 +208,6 @@ val enableNonOneUiPatch = bytecodePatch(
         StoreDownloadRequestFingerprint.method.applyStoreProfile()
         StoreUpdateCheckRequestFingerprint.method.applyStoreProfile()
         ShowSoftInputFingerprint.method.applyShowSoftInputCompat()
-        PlatformFeatureFlagsInitializerFingerprint.method.forcePlatformVersionSupported()
 
         val initializedServiceCount = inputMethodServiceClassTypes.count { type ->
             val classDef = classDefBy(type)
@@ -248,26 +251,21 @@ private fun MutableMethod.applyShowSoftInputCompat() {
     )
 }
 
-private fun MutableMethod.forcePlatformVersionSupported() {
-    findInstructionIndicesReversed {
-        opcode == Opcode.SGET && getReference<FieldReference>()?.isSemPlatformVersionField() == true
-    }.forEach { index ->
-        val register = getInstruction<OneRegisterInstruction>(index).registerA
-        replaceInstruction(index, "const v$register, 0xf423f")
-    }
-}
-
 private fun Instruction.requiresPlatformReplacement(
     unavailableType: (String) -> Boolean,
     replaceDrawableAccess: Boolean,
     replaceSettingsWindowFlags: Boolean,
+    forcePlatformVersion: Boolean,
 ): Boolean {
     val reference = (this as? ReferenceInstruction)?.reference ?: return false
     if (reference is MethodReference &&
         (reference.isSetInputViewReference() ||
             reference.compatReference(replaceDrawableAccess, replaceSettingsWindowFlags, opcode) != null)
     ) return true
-    if (reference is FieldReference && reference.sprStyleableReference() != null) return true
+    if (reference is FieldReference) {
+        if (reference.sprStyleableReference() != null) return true
+        if (forcePlatformVersion && opcode == Opcode.SGET && reference.isSemPlatformVersionField()) return true
+    }
 
     return usesUnavailableOneUiReference(unavailableType)
 }
@@ -307,6 +305,7 @@ private fun MutableMethod.replacePlatformDependency(
     unavailableType: (String) -> Boolean,
     replaceDrawableAccess: Boolean,
     replaceSettingsWindowFlags: Boolean,
+    forcePlatformVersion: Boolean,
 ) {
     val instruction = getInstructionOrNull<Instruction>(index) ?: return
     val reference = (instruction as? ReferenceInstruction)?.reference ?: return
@@ -333,6 +332,11 @@ private fun MutableMethod.replacePlatformDependency(
         val replacement = reference.sprStyleableReference()
         if (replacement != null) {
             replaceFieldReference(index, instruction, replacement)
+            return
+        }
+        if (forcePlatformVersion && instruction.opcode == Opcode.SGET && reference.isSemPlatformVersionField()) {
+            val register = (instruction as OneRegisterInstruction).registerA
+            replaceInstruction(index, "const v$register, 0x000f423f")
             return
         }
     }
